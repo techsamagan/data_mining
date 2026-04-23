@@ -1,8 +1,8 @@
 import pandas as pd
 
 # 1. Load the dataset
-df = pd.read_csv('Crimes_-_2024_20260318.csv')
 
+df = pd.read_csv('Crimes_-_2024_20260318.csv')
 # 2. Check for missing values
 print("Missing values per column:\n", df.isnull().sum())
 

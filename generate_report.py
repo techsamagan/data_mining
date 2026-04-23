@@ -125,10 +125,10 @@ pdf.set_font("Helvetica", "", 12)
 pdf.set_text_color(60, 60, 60)
 info = [
     ("Course",   "Data Mining"),
-    ("Student",  "Sama Gannurdinov"),
+    ("Student",  "Samagan Nurdinov"),
     ("Date",     "April 2026"),
     ("Dataset",  "Chicago Crimes 2024 (City of Chicago Open Data)"),
-    ("GitHub",   "github.com/samagannurdinov"),
+    ("GitHub",   "github.com/techsamagan"),
 ]
 for label, val in info:
     pdf.set_font("Helvetica", "B", 12)
@@ -433,11 +433,99 @@ pdf.add_image_centered("roc_curve.png", w=130)
 pdf.fig_caption("Figure 10: ROC curve (AUC=0.8154). Significantly above the random baseline diagonal.")
 
 
-# ─── 6. KEY FINDINGS ──────────────────────────────────────────────────────────
+# ─── 6. FREQUENT PATTERN MINING ──────────────────────────────────────────────
 pdf.add_page()
-pdf.chapter_title(6, "Key Findings & Insights")
+pdf.chapter_title(6, "Model 3: Frequent Pattern Mining (Apriori Algorithm)")
 
-pdf.section_title("6.1  Geographic Crime Distribution")
+pdf.section_title("6.1  Why Frequent Pattern Mining?")
+pdf.body_text(
+    "While the clustering model reveals WHERE crimes concentrate and the classification "
+    "model predicts WHETHER an arrest will occur, neither model answers a third question: "
+    "WHAT combinations of crime attributes co-occur more often than chance? Frequent Pattern "
+    "Mining (Apriori algorithm) is the natural tool for this question. It discovers "
+    "association rules of the form 'IF [crime type + location type] THEN [arrest outcome]' "
+    "along with objective metrics: support (how often the pattern appears), confidence "
+    "(reliability), and lift (strength relative to random chance). These rules are "
+    "human-readable and directly actionable for law enforcement policy."
+)
+
+pdf.section_title("6.2  Data Preparation for Apriori")
+pdf.body_text(
+    "Each crime incident was converted into a transaction (basket) containing six categorical "
+    "items: Crime Category, Time Period, Location Type, City Sector, Arrest Outcome, and "
+    "Domestic Flag. The 10 most frequent crime types were retained to keep the itemset space "
+    "tractable. This yielded 237,929 transactions across 24 unique items."
+)
+pdf.table_header(["Parameter", "Value", "Justification"], [55, 45, 90])
+config_fpm = [
+    ("Transactions",     "237,929",          "Top-10 crime types (filtered from 257,547 total records)"),
+    ("Unique items",     "24",               "Crime type (10) + Time (4) + Location (2) + Sector (4) + Arrest (2) + Domestic (2)"),
+    ("Min. support",     "3% (0.03)",        "Captures patterns in at least ~7,100 incidents; filters noise"),
+    ("Min. confidence",  "60% (0.60)",       "Rule must correctly predict the consequent 60%+ of the time"),
+    ("Frequent itemsets","333",              "All 1-, 2-, and 3-item combinations above the support threshold"),
+    ("Total rules",      "316",              "All rules above the confidence threshold; 141 are arrest-related"),
+]
+for i, row in enumerate(config_fpm):
+    pdf.table_row(list(row), [55, 45, 90], fill=(i % 2 == 0))
+pdf.ln(4)
+
+pdf.section_title("6.3  Top Association Rules")
+pdf.body_text(
+    "The table below shows the 8 strongest arrest-related rules, ranked by lift. "
+    "A lift > 1.0 means the antecedent and consequent co-occur more often than "
+    "expected by chance. Lift = 2.43 means Motor Vehicle Theft is 2.43x more likely "
+    "to appear with an outdoor, no-arrest outcome than random co-occurrence would predict."
+)
+fpm_rules = [
+    ("Crime:MOTOR VEHICLE THEFT",  "Loc:Outdoor, NotArrested",     "0.068", "0.747", "2.430"),
+    ("Crime:DECEPTIVE PRACTICE",   "Loc:Indoor, NotArrested",      "0.059", "0.885", "1.517"),
+    ("Crime:BURGLARY",             "Loc:Indoor, NotArrested",      "0.031", "0.870", "1.492"),
+    ("Crime:MOTOR VEHICLE THEFT",  "NonDomestic, NotArrested",     "0.087", "0.958", "1.309"),
+    ("Crime:DECEPTIVE PRACTICE",   "NonDomestic, NotArrested",     "0.064", "0.951", "1.300"),
+    ("Crime:BURGLARY",             "NonDomestic, NotArrested",     "0.032", "0.911", "1.246"),
+    ("Crime:ROBBERY",              "NonDomestic, NotArrested",     "0.034", "0.894", "1.223"),
+    ("Crime:THEFT",                "NonDomestic, NotArrested",     "0.225", "0.890", "1.217"),
+]
+pdf.table_header(["Antecedent (IF)", "Consequent (THEN)", "Support", "Confidence", "Lift"], [62, 62, 18, 22, 16])
+for i, row in enumerate(fpm_rules):
+    pdf.table_row(list(row), [62, 62, 18, 22, 16], fill=(i % 2 == 0))
+pdf.ln(4)
+
+pdf.section_title("6.4  Key Interpretations")
+pdf.bullet(
+    "Motor Vehicle Theft is the strongest pattern driver (lift = 2.43): when a car theft "
+    "is reported on an outdoor location, the probability of no arrest is 74.7%. This rule "
+    "covers 6.8% of all incidents - a meaningful share of the dataset."
+)
+pdf.bullet(
+    "Deceptive Practice (fraud, identity theft) has the highest confidence: 88.5% of such "
+    "crimes occur indoors and result in no arrest. These crimes are difficult to resolve "
+    "at the scene because the offender is typically absent."
+)
+pdf.bullet(
+    "Theft is the highest-support pattern (22.5% of transactions), with 89% confidence "
+    "toward no arrest. This means nearly 1 in 4 transactions in the database follows the "
+    "rule 'Theft => Not Arrested' - the most prevalent crime-outcome pattern in Chicago 2024."
+)
+pdf.bullet(
+    "All top rules share the NotArrested consequent, confirming the 85.8% no-arrest "
+    "baseline in the data. The patterns distinguish WHICH crime types and locations are "
+    "most strongly associated with unresolved incidents - a direct guide for policy focus."
+)
+
+pdf.add_image_centered("apriori_item_frequency.png", w=160)
+pdf.fig_caption("Figure 11: Item support across all 24 items. NotArrested and NonDomestic are most frequent.")
+pdf.add_image_centered("apriori_scatter.png", w=155)
+pdf.fig_caption("Figure 12: Support vs Confidence scatter for arrest-related rules (color = lift).")
+pdf.add_image_centered("apriori_top_rules.png", w=160)
+pdf.fig_caption("Figure 13: Top 10 rules ranked by lift. Green = Not Arrested consequent; Red = Arrested.")
+
+
+# ─── 7. KEY FINDINGS ──────────────────────────────────────────────────────────
+pdf.add_page()
+pdf.chapter_title(7, "Key Findings & Insights")
+
+pdf.section_title("7.1  Geographic Crime Distribution")
 pdf.bullet(
     "Crime is not uniformly distributed - it is highly concentrated. The top 10 community "
     "areas account for a disproportionate share of incidents. On a per-capita basis, "
@@ -451,7 +539,7 @@ pdf.bullet(
     "arrest resolution."
 )
 
-pdf.section_title("6.2  Temporal Patterns")
+pdf.section_title("7.2  Temporal Patterns")
 pdf.bullet(
     "Evening and afternoon are the peak crime windows: Afternoon (31.2%) and Evening (28.5%) "
     "together account for nearly 60% of all incidents. However, the arrest rate is highest "
@@ -463,7 +551,7 @@ pdf.bullet(
     "pointing to a gap in enforcement during overnight hours at indoor locations."
 )
 
-pdf.section_title("6.3  Arrest Prediction Drivers")
+pdf.section_title("7.3  Arrest Prediction Drivers")
 pdf.bullet(
     "Crime Type Encoded is the most important feature in the Random Forest model. "
     "This means the type of crime committed is the single strongest predictor of "
@@ -480,7 +568,20 @@ pdf.bullet(
     "crimes committed during daytime hours, consistent with greater police visibility."
 )
 
-pdf.section_title("6.4  Data Integration Insight")
+pdf.section_title("7.4  Frequent Pattern Insights")
+pdf.bullet(
+    "Apriori mining revealed that Motor Vehicle Theft, Deceptive Practice, and Burglary "
+    "are the three crime types most strongly associated with no arrest outcome (lift 2.43, "
+    "1.52, and 1.49 respectively). These crimes share a common structure: the offender "
+    "is absent at the time of reporting, making on-scene apprehension nearly impossible."
+)
+pdf.bullet(
+    "Theft is the single highest-support pattern (22.5% of all transactions), with 89% "
+    "confidence toward no arrest. This means the most common crime in Chicago is also "
+    "among the least likely to be resolved - highlighting a systemic enforcement gap."
+)
+
+pdf.section_title("7.5  Data Integration Insight")
 pdf.bullet(
     "Raw crime counts are misleading without population context. The Loop appears to be "
     "a top-5 crime area by count (9,289 incidents), but its 204/1k rate is driven partly "
@@ -490,11 +591,11 @@ pdf.bullet(
 )
 
 
-# ─── 7. FUTURE WORK & LIMITATIONS ────────────────────────────────────────────
+# ─── 8. FUTURE WORK & LIMITATIONS ────────────────────────────────────────────
 pdf.add_page()
-pdf.chapter_title(7, "Future Work & Limitations")
+pdf.chapter_title(8, "Future Work & Limitations")
 
-pdf.section_title("7.1  Current Limitations")
+pdf.section_title("8.1  Current Limitations")
 pdf.bullet(
     "Class imbalance: Arrests represent only 13.85% of incidents. Even with balanced "
     "class weights, the model's arrest recall is 0.55 - meaning 45% of actual arrests "
@@ -517,13 +618,7 @@ pdf.bullet(
     "boundaries may not align well with circular Euclidean clusters."
 )
 
-pdf.section_title("7.2  Future Improvements")
-pdf.bullet(
-    "Frequent Pattern Mining: Apply the Apriori algorithm to discover association rules "
-    "between crime type, location, and time period (e.g., 'Theft on the street in the "
-    "afternoon' is 3x more common than expected). This would complete all three model "
-    "types required by the course."
-)
+pdf.section_title("8.2  Future Improvements")
 pdf.bullet(
     "Hierarchical or DBSCAN clustering: Unlike K-Means, DBSCAN can discover clusters "
     "of arbitrary shape and automatically identify noise points (isolated crime incidents). "
@@ -541,16 +636,16 @@ pdf.bullet(
 )
 
 
-# ─── 8. CONCLUSION ────────────────────────────────────────────────────────────
+# ─── 9. CONCLUSION ────────────────────────────────────────────────────────────
 pdf.add_page()
-pdf.chapter_title(8, "Conclusion")
+pdf.chapter_title(9, "Conclusion")
 
 pdf.body_text(
     "This project successfully applied a full data mining workflow to the Chicago Crime "
     "2024 dataset - from raw data ingestion through preprocessing, data integration, "
-    "and two distinct predictive models. Starting from 259,032 raw records, the pipeline "
-    "produced a clean, enriched, and analytically ready dataset that supported both "
-    "unsupervised and supervised machine learning."
+    "and three distinct analytical models. Starting from 259,032 raw records, the pipeline "
+    "produced a clean, enriched, and analytically ready dataset that supported unsupervised "
+    "learning, supervised classification, and frequent pattern discovery."
 )
 
 pdf.section_title("Summary of Deliverables")
@@ -562,7 +657,8 @@ deliverables = [
     ("Data Integration",        "2020 Census demographics merged for all 77 community areas"),
     ("Model 1 - Clustering",    "K-Means (K=10) with elbow validation and cluster profiling"),
     ("Model 2 - Classification","Random Forest: 84.3% accuracy, ROC-AUC 0.8154"),
-    ("Visualizations",          "10 publication-quality charts generated"),
+    ("Model 3 - Freq. Patterns","Apriori: 333 itemsets, 316 rules, top lift 2.43 (Motor Vehicle Theft -> Outdoor+NoArrest)"),
+    ("Visualizations",          "13 publication-quality charts generated"),
 ]
 pdf.table_header(["Step", "Outcome"], [70, 120])
 for i, (step, outcome) in enumerate(deliverables):
@@ -572,10 +668,11 @@ pdf.ln(6)
 pdf.body_text(
     "The most important lesson from this project is that crime data analysis requires "
     "multiple lenses. Raw counts mislead; per-capita rates reveal equity issues. "
-    "Geographic clustering shows WHERE to act; classification shows WHAT predicts resolution. "
-    "No single model or metric tells the whole story - and that is precisely why a "
-    "structured data mining pipeline that combines preprocessing, integration, and "
-    "multiple models is necessary for actionable insights."
+    "Geographic clustering shows WHERE to act; classification shows WHAT predicts resolution; "
+    "frequent pattern mining shows WHICH crime attribute combinations are systematically "
+    "under-resolved. No single model or metric tells the whole story - and that is precisely "
+    "why a structured data mining pipeline that combines all three approaches is necessary "
+    "for actionable insights."
 )
 
 
